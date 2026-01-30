@@ -55,6 +55,7 @@ LLM Generation (OpenAI)
    ↓
 Schema Validation + Refusal Logic
 
+
 📁 Project Structure
 semantic-search-Engine/
 │
@@ -87,6 +88,7 @@ semantic-search-Engine/
 ├── .env                   # OPENAI_API_KEY (gitignored)
 ├── requirements.txt
 └── README.md
+
 
 🔑 Key Concepts Implemented
 1️⃣ Semantic Search (No LLM Involved)
