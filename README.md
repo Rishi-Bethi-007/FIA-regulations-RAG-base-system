@@ -1,184 +1,258 @@
-# Semantic Search Engine (FAISS + Sentence Transformers)
-
-This project implements a **semantic search engine from scratch**, focusing on retrieval quality, system design, and evaluation.  
-The system retrieves relevant text chunks based on **semantic similarity**, not keyword matching, using dense embeddings and a FAISS vector index.
-
-This project is intentionally built **without any LLMs** to deeply understand retrieval mechanics before introducing Retrieval-Augmented Generation (RAG).
-
----
-
-## 🚀 Overview
-
-Keyword-based search often fails when queries and documents use different wording for the same concept.  
-This project solves that problem by:
-
-- converting text into dense vector embeddings
-- indexing them in a vector database (FAISS)
-- retrieving the most semantically relevant chunks for a given query
-
-The result is a **retrieval backbone** that can later be reused directly in RAG systems.
-
----
-
-## 🧠 System Architecture
-
-### Offline Indexing Pipeline
-# Semantic Search Engine (FAISS + Sentence Transformers)
-
-This project implements a **semantic search engine from scratch**, focusing on retrieval quality, system design, and evaluation.  
-The system retrieves relevant text chunks based on **semantic similarity**, not keyword matching, using dense embeddings and a FAISS vector index.
-
-This project is intentionally built **without any LLMs** to deeply understand retrieval mechanics before introducing Retrieval-Augmented Generation (RAG).
-
----
-
-## 🚀 Overview
-
-Keyword-based search often fails when queries and documents use different wording for the same concept.  
-This project solves that problem by:
-
-- converting text into dense vector embeddings
-- indexing them in a vector database (FAISS)
-- retrieving the most semantically relevant chunks for a given query
-
-The result is a **retrieval backbone** that can later be reused directly in RAG systems.
-
----
-
-## 🧠 System Architecture
-
-### Offline Indexing Pipeline
-Documents (.txt / .md)
-↓
-Chunking (sentence-aware)
-↓
-Embedding (sentence-transformers)
-↓
-Mean pooling + L2 normalization
-↓
-FAISS vector index + JSON metadata
-
-### Online Query Pipeline
-
----
-
-## ✂️ Chunking Strategies
-
-The system supports multiple chunking strategies to study their impact on retrieval quality:
-
-- **Fixed-size chunking** (character-based)
-- **Overlapping chunking** (character-based with overlap)
-- **Sentence-aware chunking (default)**  
-  Preserves semantic boundaries and improves retrieval quality for conceptual queries.
-
-Chunking is treated as a **first-class design decision**, not a preprocessing detail.
-
----
-
-## 🔢 Embeddings & Similarity
-
-- **Model**: `sentence-transformers/all-MiniLM-L6-v2`
-- **Pooling**: Mean pooling over token embeddings
-- **Normalization**: L2 normalization
-- **Similarity metric**: Cosine similarity (via inner product)
-
-Normalization ensures:
-- stable similarity scores
-- fair comparison across different chunk lengths
-- correct behavior with FAISS `IndexFlatIP`
-
----
-
-## 🗄️ Vector Index
-
-- **Library**: FAISS
-- **Index type**: `IndexFlatIP` (exact search)
-
-**Why exact search?**
-- correctness over scale at this stage
-- easier debugging and evaluation
-- clean baseline before approximate methods (IVF / HNSW)
-
-The index and metadata are persisted to disk and reloaded for querying.
-
----
-
-## 🔍 Usage
-### Build the index
-Place `.txt` or `.md` files in `data/docs/`, then run:
-```bash
-python -m index.build_index
-
-This creates:
-
-index/chunk_index.faiss
-
-index/chunk_metadata.json
-
-Search
-
-python -m index.search "What is a vector database?" --top_k 5
-
-
-📊 Evaluation & Key Insight
-
-The system was evaluated using a gold query set, mapping queries to expected documents.
-
-Metric used
-
-Doc Hit@3 (whether the correct document appears in the top-3 retrieved documents)
-
-Key Observation
-
-“I evaluated my semantic search system with a gold query set and observed that abstract conceptual queries often require LLM-based synthesis beyond pure embedding retrieval.”
-
-Interpretation
-
-Concrete, well-scoped queries (e.g. “What is FAISS used for?”) are retrieved accurately.
-
-Abstract or explanatory queries (e.g. “Explain cosine similarity”) often retrieve semantically related documents rather than a single definitive source.
-
-This behavior is expected for embedding-only retrieval and directly motivates the use of LLMs for synthesis in RAG systems.
-
-🧪 Evaluation Script
-python -m evaluation.eval_retrieval --top_k_docs 3
-
-
-Outputs:
-
-HIT / MISS per query
-
-overall Doc Hit@K score
-
-🧩 Design Decisions
-
-Retrieval-first approach before introducing LLMs
-
-Explicit separation of:
-
-ingestion
-
-chunking
-
-embedding
-
-indexing
-
-querying
-
-Offline indexing vs online querying
-
-Human-readable metadata for debuggability
-
-This mirrors how real-world AI systems are designed and debugged.
-
-📦 Project Structure
-semantic-search/
-├── data/docs/              # raw text documents
-├── chunking/               # chunking strategies
-├── embeddings/             # embedding logic
-├── index/                  # index build + search
-├── evaluation/             # evaluation scripts
-├── config.py
+🔍 Retrieval-Augmented Generation (RAG) System from Scratch
+
+An end-to-end Retrieval-Augmented Generation (RAG) system built from first principles, demonstrating how modern AI applications combine semantic search with large language models to produce grounded, reliable answers with source citations.
+
+This project intentionally avoids high-level frameworks at first and implements the core mechanics manually to build deep system-level understanding.
+
+🚀 What This Project Does
+
+Given a natural-language query, the system:
+
+Retrieves the most relevant document chunks using dense vector similarity (FAISS)
+
+Augments the user prompt with retrieved context
+
+Generates a grounded answer using an LLM
+
+Validates the output against a strict JSON schema
+
+Refuses to answer when information is missing
+
+Cites the exact document chunks used
+
+This is real RAG, not just semantic search and not just generation.
+
+🧠 Why This Project Matters
+
+Modern LLM applications fail not because models are weak, but because:
+
+context is poorly retrieved
+
+hallucinations go unchecked
+
+outputs aren’t validated
+
+costs and failure modes are ignored
+
+This project focuses on engineering reliability, not model hype.
+
+🏗️ System Architecture
+Documents
+   ↓
+Chunking
+   ↓
+Embeddings (Sentence Transformers)
+   ↓
+FAISS Vector Index
+   ↓
+Query Embedding
+   ↓
+Top-K Retrieval
+   ↓
+Prompt Assembly (with guardrails)
+   ↓
+LLM Generation (OpenAI)
+   ↓
+Schema Validation + Refusal Logic
+
+📁 Project Structure
+semantic-search-Engine/
+│
+├── data/                  # Raw text documents
+│
+├── chunking/
+│   ├── fixed.py
+│   ├── overlap.py
+│   └── recursive.py
+│
+├── embeddings/
+│   └── embedder.py        # Sentence-transformer embedder
+│
+├── index/
+│   ├── build_index.py     # Build FAISS index + metadata
+│   └── search.py          # FAISS retrieval logic
+│
+├── rag/
+│   ├── prompt_builder.py  # RAG prompt + guardrails
+│   ├── rag_pipeline.py    # Retrieval + generation
+│   └── test_rag.py        # End-to-end demo
+│
+├── evaluation/
+│   └── gold_queries.json  # Gold set for evaluation
+│
+├── index/
+│   ├── chunk_index.faiss
+│   └── chunk_metadata.json
+│
+├── .env                   # OPENAI_API_KEY (gitignored)
 ├── requirements.txt
 └── README.md
+
+🔑 Key Concepts Implemented
+1️⃣ Semantic Search (No LLM Involved)
+
+Sentence-level embeddings
+
+Vector normalization
+
+Cosine similarity
+
+FAISS indexing
+
+Top-K nearest-neighbor retrieval
+
+2️⃣ Chunking Strategies
+
+Fixed-size chunking
+
+Overlapping windows
+
+Structure-aware (recursive) chunking
+
+Tradeoffs between recall, precision, and cost
+
+3️⃣ Retrieval-Augmented Generation
+
+Context injection into prompts
+
+Explicit grounding rules
+
+Source citation tracking
+
+Refusal behavior when context is insufficient
+
+4️⃣ Prompt Engineering (Engineering-Grade)
+
+System-level instruction dominance
+
+Explicit “don’t guess” rules
+
+Guardrails against hallucination
+
+Context-only answering
+
+Confidence calibration
+
+5️⃣ Output Validation
+
+Strict JSON schema
+
+Automatic retries on invalid output
+
+Fail-fast behavior after repeated violations
+
+🧪 Example Queries & Behavior
+Grounded Answer
+
+Query: What is a vector database?
+
+{
+  "answer": "A vector database is a data store specialized for handling data represented as high-dimensional vectors, enabling efficient similarity search over embeddings.",
+  "confidence": 1.0,
+  "used_sources": [
+    "vector_databases.txt chunk=1",
+    "vector_databases.txt chunk=4"
+  ]
+}
+
+Refusal (Correct Behavior)
+
+Query: Who won the 2035 Cricket World Cup?
+
+{
+  "answer": "I don't know",
+  "confidence": 0.3,
+  "used_sources": []
+}
+
+
+This refusal is intentional and correct — no hallucination.
+
+📊 Evaluation Results
+
+I evaluated the semantic retrieval layer using a gold query set and measured document hit@3.
+
+Result:
+
+Doc Hit@3: 5/10 = 50%
+
+Key Insight
+
+Abstract conceptual queries often require LLM-based synthesis beyond pure embedding retrieval.
+
+This directly motivates:
+
+query rewriting
+
+better chunking
+
+hybrid retrieval strategies (future work)
+
+🧠 Engineering Lessons Learned
+
+Embeddings ≠ answers — retrieval quality dominates RAG performance
+
+Chunking strategy affects accuracy more than model choice
+
+Guardrails matter more than clever prompts
+
+LLMs must be treated as unreliable collaborators
+
+Environment setup is a real engineering challenge (Conda isolation used)
+
+🛠️ Tech Stack
+
+Python 3.10
+
+Sentence Transformers
+
+FAISS (CPU)
+
+OpenAI API
+
+Pydantic
+
+Conda (isolated environment)
+
+⚙️ How to Run
+1️⃣ Build the index (one-time)
+python -m index.build_index
+
+2️⃣ Run RAG demo
+python -m rag.test_rag
+
+🔒 Security & Best Practices
+
+API keys stored in .env
+
+.env is gitignored
+
+No secrets committed
+
+Deterministic failure handling
+
+🧭 Roadmap / Next Improvements
+
+Query rewriting for better retrieval
+
+RAG-specific evaluation metrics (faithfulness, groundedness)
+
+Confidence calibration
+
+Hybrid lexical + dense retrieval
+
+Framework comparison (LangChain / LlamaIndex)
+
+Agentic retrieval planning
+
+🧑‍💻 Author Notes
+
+This project was built as part of a deliberate transition from ML theory → AI engineering, focusing on:
+
+systems thinking
+
+failure modes
+
+production realism
+
+It reflects how real LLM applications are built — not demos, but reliable systems.

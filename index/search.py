@@ -1,6 +1,5 @@
 import argparse
 from email import parser
-from email import parser
 import json
 from typing import List , Dict ,Any
 from collections import defaultdict
@@ -9,6 +8,47 @@ import faiss
 import numpy as np
 
 from embeddings.embedder import Embedder
+
+class FaissRetriever:
+    """
+    Thin wrapper around your existing load_index/load_metadata/search() functions
+    so your RAG pipeline can just call: retriever.retrieve(query, top_k)
+    """
+
+    def __init__(self, index_path: str = "index/chunk_index.faiss", meta_path: str = "index/chunk_metadata.json"):
+        self.index = load_index(index_path)
+        self.metadata = load_metadata(meta_path)
+
+        if self.index.ntotal != len(self.metadata):
+            raise ValueError(
+                f"Index vectors ({self.index.ntotal}) != metadata rows ({len(self.metadata)}). "
+                "Your mapping is inconsistent."
+            )
+
+        self.embedder = Embedder()
+
+    def retrieve(self, query: str, top_k: int = 5):
+        results = search(
+            query=query,
+            embedder=self.embedder,
+            index=self.index,
+            metadata=self.metadata,
+            top_k=top_k
+        )
+
+        # Convert to the exact shape your prompt_builder expects
+        return [
+            {
+                "doc_id": r["doc_id"],
+                "chunk_id": r["chunk_id"],
+                "text": r["text"]
+            }
+            for r in results
+        ]
+
+
+
+
 
 def load_index(index_path: str) -> faiss.Index:
     """Load a FAISS index from the specified path."""
