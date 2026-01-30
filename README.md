@@ -1,151 +1,187 @@
-🔍 Retrieval-Augmented Generation (RAG) System from Scratch
+# 🔍 Retrieval-Augmented Generation (RAG) System from Scratch
 
-An end-to-end Retrieval-Augmented Generation (RAG) system built from first principles, demonstrating how modern AI applications combine semantic search with large language models to produce grounded, reliable answers with source citations.
+An end-to-end **Retrieval-Augmented Generation (RAG)** system built from first principles, demonstrating how modern AI applications combine **semantic search** with **large language models** to produce **grounded, reliable answers with citations**.
 
-This project intentionally avoids high-level frameworks at first and implements the core mechanics manually to build deep system-level understanding.
+This project intentionally avoids high-level frameworks at first and implements the core mechanics manually to build **deep system-level understanding** of real-world LLM systems.
 
-🚀 What This Project Does
+---
+
+## 🚀 What This Project Does
 
 Given a natural-language query, the system:
 
-Retrieves the most relevant document chunks using dense vector similarity (FAISS)
+1. **Retrieves** the most relevant document chunks using dense vector similarity (FAISS)
+2. **Augments** the user prompt with retrieved context
+3. **Generates** a grounded answer using an LLM
+4. **Validates** the output against a strict JSON schema
+5. **Refuses** to answer when information is missing
+6. **Cites** the exact document chunks used
 
-Augments the user prompt with retrieved context
+> This is **real RAG** — not just semantic search and not just generation.
 
-Generates a grounded answer using an LLM
+---
 
-Validates the output against a strict JSON schema
-
-Refuses to answer when information is missing
-
-Cites the exact document chunks used
-
-This is real RAG, not just semantic search and not just generation.
-
-🧠 Why This Project Matters
+## 🧠 Why This Project Matters
 
 Modern LLM applications fail not because models are weak, but because:
 
-context is poorly retrieved
+- Context is poorly retrieved  
+- Hallucinations go unchecked  
+- Outputs aren’t validated  
+- Cost and failure modes are ignored  
 
-hallucinations go unchecked
+This project focuses on **engineering reliability**, not model hype.
 
-outputs aren’t validated
+---
 
-costs and failure modes are ignored
+## 🏗️ System Architecture
 
-This project focuses on engineering reliability, not model hype.
+# 🔍 Retrieval-Augmented Generation (RAG) System from Scratch
 
-🏗️ System Architecture
+An end-to-end **Retrieval-Augmented Generation (RAG)** system built from first principles, demonstrating how modern AI applications combine **semantic search** with **large language models** to produce **grounded, reliable answers with citations**.
+
+This project intentionally avoids high-level frameworks at first and implements the core mechanics manually to build **deep system-level understanding** of real-world LLM systems.
+
+---
+
+## 🚀 What This Project Does
+
+Given a natural-language query, the system:
+
+1. **Retrieves** the most relevant document chunks using dense vector similarity (FAISS)
+2. **Augments** the user prompt with retrieved context
+3. **Generates** a grounded answer using an LLM
+4. **Validates** the output against a strict JSON schema
+5. **Refuses** to answer when information is missing
+6. **Cites** the exact document chunks used
+
+> This is **real RAG** — not just semantic search and not just generation.
+
+---
+
+## 🧠 Why This Project Matters
+
+Modern LLM applications fail not because models are weak, but because:
+
+- Context is poorly retrieved  
+- Hallucinations go unchecked  
+- Outputs aren’t validated  
+- Cost and failure modes are ignored  
+
+This project focuses on **engineering reliability**, not model hype.
+
+---
+
+## 🏗️ System Architecture
+
 Documents
-   ↓
+↓
 Chunking
-   ↓
+↓
 Embeddings (Sentence Transformers)
-   ↓
+↓
 FAISS Vector Index
-   ↓
+↓
 Query Embedding
-   ↓
+↓
 Top-K Retrieval
-   ↓
+↓
 Prompt Assembly (with guardrails)
-   ↓
+↓
 LLM Generation (OpenAI)
-   ↓
+↓
 Schema Validation + Refusal Logic
 
-📁 Project Structure
+
+---
+
+## 📁 Project Structure
+
 semantic-search-Engine/
 │
-├── data/                  # Raw text documents
+├── data/ # Raw text documents
 │
 ├── chunking/
-│   ├── fixed.py
-│   ├── overlap.py
-│   └── recursive.py
+│ ├── fixed.py
+│ ├── overlap.py
+│ └── recursive.py
 │
 ├── embeddings/
-│   └── embedder.py        # Sentence-transformer embedder
+│ └── embedder.py # Sentence-transformer embedder
 │
 ├── index/
-│   ├── build_index.py     # Build FAISS index + metadata
-│   └── search.py          # FAISS retrieval logic
+│ ├── build_index.py # Build FAISS index + metadata
+│ └── search.py # FAISS retrieval logic
 │
 ├── rag/
-│   ├── prompt_builder.py  # RAG prompt + guardrails
-│   ├── rag_pipeline.py    # Retrieval + generation
-│   └── test_rag.py        # End-to-end demo
+│ ├── prompt_builder.py # RAG prompt + guardrails
+│ ├── rag_pipeline.py # Retrieval + generation
+│ └── test_rag.py # End-to-end demo
 │
 ├── evaluation/
-│   └── gold_queries.json  # Gold set for evaluation
+│ └── gold_queries.json # Gold set for evaluation
 │
 ├── index/
-│   ├── chunk_index.faiss
-│   └── chunk_metadata.json
+│ ├── chunk_index.faiss
+│ └── chunk_metadata.json
 │
-├── .env                   # OPENAI_API_KEY (gitignored)
+├── .env # OPENAI_API_KEY (gitignored)
 ├── requirements.txt
 └── README.md
 
-🔑 Key Concepts Implemented
-1️⃣ Semantic Search (No LLM Involved)
 
-Sentence-level embeddings
+---
 
-Vector normalization
+## 🔑 Key Concepts Implemented
 
-Cosine similarity
+### 1️⃣ Semantic Search (No LLM Involved)
+- Sentence-level embeddings  
+- Vector normalization  
+- Cosine similarity  
+- FAISS indexing  
+- Top-K nearest-neighbor retrieval  
 
-FAISS indexing
+---
 
-Top-K nearest-neighbor retrieval
+### 2️⃣ Chunking Strategies
+- Fixed-size chunking  
+- Overlapping windows  
+- Structure-aware (recursive) chunking  
+- Tradeoffs between **recall, precision, and cost**
 
-2️⃣ Chunking Strategies
+---
 
-Fixed-size chunking
+### 3️⃣ Retrieval-Augmented Generation (RAG)
+- Context injection into prompts  
+- Explicit grounding rules  
+- Source citation tracking  
+- Refusal behavior when context is insufficient  
 
-Overlapping windows
+---
 
-Structure-aware (recursive) chunking
+### 4️⃣ Prompt Engineering (Engineering-Grade)
+- System-level instruction dominance  
+- Explicit **“don’t guess”** rules  
+- Guardrails against hallucination  
+- Context-only answering  
+- Confidence calibration  
 
-Tradeoffs between recall, precision, and cost
+---
 
-3️⃣ Retrieval-Augmented Generation
+### 5️⃣ Output Validation
+- Strict JSON schema  
+- Automatic retries on invalid output  
+- Fail-fast behavior after repeated violations  
 
-Context injection into prompts
+---
 
-Explicit grounding rules
+## 🧪 Example Queries & Behavior
 
-Source citation tracking
+### ✅ Grounded Answer
 
-Refusal behavior when context is insufficient
+**Query:** *What is a vector database?*
 
-4️⃣ Prompt Engineering (Engineering-Grade)
-
-System-level instruction dominance
-
-Explicit “don’t guess” rules
-
-Guardrails against hallucination
-
-Context-only answering
-
-Confidence calibration
-
-5️⃣ Output Validation
-
-Strict JSON schema
-
-Automatic retries on invalid output
-
-Fail-fast behavior after repeated violations
-
-🧪 Example Queries & Behavior
-Grounded Answer
-
-Query: What is a vector database?
-
+```json
 {
   "answer": "A vector database is a data store specialized for handling data represented as high-dimensional vectors, enabling efficient similarity search over embeddings.",
   "confidence": 1.0,
@@ -155,7 +191,8 @@ Query: What is a vector database?
   ]
 }
 
-Refusal (Correct Behavior)
+
+🚫 Refusal (Correct Behavior)
 
 Query: Who won the 2035 Cricket World Cup?
 
@@ -170,29 +207,27 @@ This refusal is intentional and correct — no hallucination.
 
 📊 Evaluation Results
 
-I evaluated the semantic retrieval layer using a gold query set and measured document hit@3.
+The semantic retrieval layer was evaluated using a gold query set, measuring document hit@3.
 
-Result:
-
-Doc Hit@3: 5/10 = 50%
+Doc Hit@3: 5 / 10 = 50%
 
 Key Insight
 
 Abstract conceptual queries often require LLM-based synthesis beyond pure embedding retrieval.
 
-This directly motivates:
+This motivates:
 
-query rewriting
+Query rewriting
 
-better chunking
+Improved chunking
 
-hybrid retrieval strategies (future work)
+Hybrid retrieval strategies
 
 🧠 Engineering Lessons Learned
 
 Embeddings ≠ answers — retrieval quality dominates RAG performance
 
-Chunking strategy affects accuracy more than model choice
+Chunking strategy often matters more than model choice
 
 Guardrails matter more than clever prompts
 
@@ -218,7 +253,7 @@ Conda (isolated environment)
 1️⃣ Build the index (one-time)
 python -m index.build_index
 
-2️⃣ Run RAG demo
+2️⃣ Run the RAG demo
 python -m rag.test_rag
 
 🔒 Security & Best Practices
@@ -249,10 +284,10 @@ Agentic retrieval planning
 
 This project was built as part of a deliberate transition from ML theory → AI engineering, focusing on:
 
-systems thinking
+Systems thinking
 
-failure modes
+Failure modes
 
-production realism
+Production realism
 
 It reflects how real LLM applications are built — not demos, but reliable systems.
