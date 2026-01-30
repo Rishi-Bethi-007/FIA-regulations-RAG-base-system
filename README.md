@@ -201,7 +201,7 @@ Query: Who won the 2035 Cricket World Cup?
   "confidence": 0.3,
   "used_sources": []
 }
-
+```
 
 This refusal is intentional and correct — no hallucination.
 
@@ -285,6 +285,199 @@ Agentic retrieval planning
 This project was built as part of a deliberate transition from ML theory → AI engineering, focusing on:
 
 Systems thinking
+
+
+## FLOW OF THE PROJECT:
+
+
+The full flow of your project (end-to-end, very detailed)
+
+I’ll describe two flows:
+
+A) Offline flow (indexing) — done once per corpus update
+B) Online flow (query answering) — per user query
+A) OFFLINE FLOW — Build the index
+
+You run:
+
+python -m index.build_index
+
+Step A1 — Load documents from data/
+
+reads each .txt
+
+stores:
+
+doc_id = filename
+
+text = file content
+
+Step A2 — Chunk each document
+
+For each doc:
+
+apply chosen chunker (fixed/overlap/recursive)
+
+output many chunks:
+
+each chunk has:
+
+doc_id
+
+chunk_id
+
+text
+
+Step A3 — Embed each chunk (one-time)
+
+call your Embedder.embed(chunks_texts)
+
+output an array:
+
+shape: (num_chunks, embedding_dim)
+
+Step A4 — Normalize embeddings (if used)
+
+for cosine similarity you typically normalize vectors to unit length
+
+you already do this in your Embedder
+
+Step A5 — Build FAISS index
+
+create FAISS index (usually inner product for normalized vectors)
+
+add all chunk vectors to index
+
+Step A6 — Save to disk
+
+save index:
+
+index/chunk_index.faiss
+
+save metadata mapping:
+
+index/chunk_metadata.json
+
+maps row i → {doc_id, chunk_id, text}
+
+✅ Offline done.
+
+B) ONLINE FLOW — Answering a user query (RAG)
+
+User asks: “What is FAISS used for?”
+
+You run:
+
+python -m rag.test_rag
+
+
+or later your API will do it.
+
+Step B1 — Guardrails pre-check (optional stage)
+
+detect prompt injection
+
+detect unsafe requests
+
+set policy: “context-only answering”
+
+Step B2 — Query embedding
+
+embed the user query using same embedder
+
+vector: shape (1, dim)
+
+normalized
+
+Step B3 — Retrieve top-k chunks from FAISS
+
+index.search(q_vec, top_k)
+
+returns:
+
+indices: chunk ids in FAISS
+
+scores: similarity scores
+
+map indices → metadata rows
+
+produce retrieved chunks:
+
+list of {doc_id, chunk_id, text}
+
+Step B4 — Build the RAG prompt
+
+You construct messages:
+
+System message:
+
+strict rules
+
+output JSON schema
+
+“answer only from context”
+
+“refuse if missing”
+
+User message includes:
+
+the retrieved CONTEXT chunks (with IDs)
+
+the QUESTION
+
+Step B5 — Call the LLM (generation)
+
+send messages to OpenAI
+
+model outputs text (should be JSON)
+
+Step B6 — Parse and validate output schema
+
+parse JSON into AnswerSchema
+
+if invalid:
+
+retry 1–3 times
+
+if still invalid:
+
+raise runtime error
+
+Step B7 — Post-check (faithfulness / refusal)
+
+(Optional but you’ll implement)
+
+verify citations refer to retrieved chunks
+
+if not → reject or force refusal
+
+Step B8 — Return answer to user
+
+answer text
+
+confidence
+
+citations
+
+✅ Online done.
+
+Why this project is real engineering
+
+Because you have:
+
+reproducible offline pipeline
+
+deterministic retrieval
+
+explicit prompt contract
+
+schema validation
+
+refusal behavior
+
+evaluation harness
+
+That’s what real LLM teams build.
 
 Failure modes
 
