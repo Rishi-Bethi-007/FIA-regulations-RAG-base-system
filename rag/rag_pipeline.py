@@ -1,67 +1,182 @@
-import os
-from dotenv import load_dotenv
+# rag/rag_pipeline.py
+from __future__ import annotations
+
+from typing import List, Dict, Any
 from openai import OpenAI
-from pydantic import ValidationError
 
-from index.search import FaissRetriever
-
-from guardrails.input_guardrails import guard_user_input
-from guardrails.output_guardrails import enforce_confidence_threshold
-from guardrails.prompt_builder import build_messages
-from guardrails.schema import AnswerSchema
-
-load_dotenv()
-
-MODEL = "gpt-4.1-mini"
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-retriever = FaissRetriever(
-    index_path="index/chunk_index.faiss",
-    meta_path="index/chunk_metadata.json",
+from config import (
+    OPENAI_API_KEY,
+    GEN_MODEL,
+    TOP_K,
+    RERANK_ENABLED,
+    RECALL_K,
 )
 
-
-def call_llm(messages):
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=messages,
-        temperature=0.2,
-    )
-    return response.choices[0].message.content
+from index.search import search
+from index.filters import build_plan
 
 
-def run_rag(query: str, top_k: int = 5) -> AnswerSchema:
+from rag.query_rewriter import rewrite_query
+from rag.reranker import rerank
+
+
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+
+# -----------------------------
+# Formatting helpers
+# -----------------------------
+def format_citations(hits: List[Dict]) -> str:
+    """Simple citation format: [i] source p.X"""
+    cites = []
+    for i, h in enumerate(hits, start=1):
+        m = h["meta"]
+        cites.append(f"[{i}] {m.get('source')} p.{m.get('page')}")
+    return "\n".join(cites)
+
+
+def build_context(hits: List[Dict]) -> str:
+    """Keep chunk text + inline metadata for traceability."""
+    blocks = []
+    for i, h in enumerate(hits, start=1):
+        m = h["meta"]
+        blocks.append(
+            f"CHUNK {i} | source={m.get('source')} | page={m.get('page')} | chunk={m.get('chunk_index')}\n"
+            f"{h.get('text', '')}"
+        )
+    return "\n\n---\n\n".join(blocks)
+
+
+# -----------------------------
+# Comparison guard
+# -----------------------------
+def enforce_per_season_min(
+    hits: List[Dict],
+    seasons: List[int],
+    top_k: int,
+    min_per_season: int = 2,
+) -> List[Dict]:
     """
-    Phase 3.1: Raw RAG pipeline
+    Ensure final evidence contains at least `min_per_season`
+    chunks from each season when doing comparisons.
     """
+    picked: List[Dict] = []
+    used = set()
 
-    # 1️⃣ Input guardrails
-    guard_user_input(query)
+    def _key(h: Dict):
+        m = h["meta"]
+        return (m.get("source"), m.get("page"), m.get("chunk_index"))
 
-    # 2️⃣ Retrieve context
-    retrieved_chunks = retriever.retrieve(query, top_k=top_k)
+    # 1) Guarantee minimum per season
+    for season in seasons:
+        season_hits = [h for h in hits if h["meta"].get("season") == season]
+        for h in season_hits[:min_per_season]:
+            k = _key(h)
+            if k not in used:
+                picked.append(h)
+                used.add(k)
 
-    # 3️⃣ Build guarded prompt
-    messages = build_messages(query, retrieved_chunks)
-
-    # 4️⃣ Call LLM with schema validation + retries
-    last_error = None
-    for _ in range(3):
-        raw = call_llm(messages)
-        try:
-            parsed = AnswerSchema.model_validate_json(raw)
+    # 2) Fill remaining slots by best overall
+    for h in hits:
+        if len(picked) >= top_k:
             break
-        except ValidationError as e:
-            last_error = e
-            messages.append({
-                "role": "user",
-                "content": "Your output was invalid. Return ONLY valid JSON."
-            })
+        k = _key(h)
+        if k not in used:
+            picked.append(h)
+            used.add(k)
+
+    return picked[:top_k]
+
+
+# -----------------------------
+# Main entrypoint
+# -----------------------------
+def answer(query: str, where: Dict[str, Any] | None = None):
+
+    # -----------------------------
+    # Query plan
+    # -----------------------------
+    plan = build_plan(query) if where is None else None
+
+    # -----------------------------
+    # Query rewriting
+    # -----------------------------
+    queries = rewrite_query(query)
+    hits: List[Dict] = []
+
+    if plan and plan.is_comparison and plan.seasons:
+        recall_per_season = max(10, RECALL_K // len(plan.seasons))
+
+        for season in plan.seasons:
+            season_where = {
+                "$and": [
+                    {"doc_type": "fia_f1_regulations"},
+                    {"season": season},
+                ]
+            }
+
+            for qx in queries:
+                hits.extend(search(qx, k=recall_per_season, where=season_where))
+
     else:
-        raise RuntimeError(f"RAG failed after retries: {last_error}")
+        base_where = where if where is not None else (plan.where if plan else None)
 
-    # 5️⃣ Output guardrails
-    if parsed.answer.strip().lower() != "i don't know":
-        enforce_confidence_threshold(parsed.confidence)
+        for qx in queries:
+            hits.extend(search(qx, k=RECALL_K, where=base_where))
 
-    return parsed
+        # -----------------------------
+        # 2) RERANK (PRECISION)
+        # -----------------------------
+    if RERANK_ENABLED:
+        hits = rerank(query, hits, top_k=max(TOP_K, 12))
+    else:
+        hits = hits[:max(TOP_K, 12)]
+
+        # -----------------------------
+        # 2.5) COMPARISON BALANCING
+        # -----------------------------
+        if plan and plan.is_comparison and plan.seasons:
+            hits = enforce_per_season_min(
+                hits=hits,
+                seasons=plan.seasons,
+                top_k=TOP_K,
+                min_per_season=2,
+            )
+        else:
+            hits = hits[:TOP_K]
+
+    # -----------------------------
+    # 3) GENERATION
+    # -----------------------------
+    context = build_context(hits)
+    citations = format_citations(hits)
+
+    prompt = f"""
+You are a RAG assistant.
+Rules:
+- Answer ONLY using the provided CONTEXT.
+- If the CONTEXT does not contain the answer, say: "I don't know based on the provided documents."
+- Include citations in the form [1], [2], ... corresponding to the chunks.
+- Do NOT repeat the same rule or sentence more than once.
+- Group similar rules together and summarize them once.
+If the question asks for a comparison:
+    - Clearly separate rules for each season.
+    - Then list explicit differences.
+    - If no difference is stated in the documents, say so explicitly.
+
+CONTEXT:
+{context}
+
+QUESTION:
+{query}
+
+CITATION INDEX:
+{citations}
+""".strip()
+
+    resp = client.responses.create(
+        model=GEN_MODEL,
+        input=prompt,
+    )
+
+    return resp.output_text, hits
